@@ -49,25 +49,33 @@ randomInt low high x = round ((fromIntegral (high - low) * x) + fromIntegral low
 --   [Float]: The remaining, unused random values
 --   String: The SVG tags that draw the image
 --
+
+
 mondrian :: Int -> Int -> Int -> Int -> [Float] -> ([Float], String)
 mondrian x y w h (r:g:b:rest)
   | w > 512 && h > 384 = (lr_rest, ul_tags ++ ur_tags ++ ll_tags ++ lr_tags)
   | w > 512 = (r_rest, l_tags ++ r_tags)
   | h > 384 = (b_rest, t_tags ++ b_tags)
-  | otherwise = (rest, rectangle x y w h ((round (r * 255)),
-                                          (round (g * 255)),
-                                          (round (b * 255))))
+  | snd (shouldSplit w rest) && snd (shouldSplit h rest) = (lr_rest, ul_tags ++ ur_tags ++ ll_tags ++ lr_tags)
+  | snd (shouldSplit w rest) = (r_rest, l_tags ++ r_tags)
+  | snd (shouldSplit h rest) = (b_rest, t_tags ++ b_tags)
+  | otherwise = (rectangle x y w h rest)
+  -- | otherwise = (rest, rectangle x y w h ((round (r * 255)),
+                                          -- (round (g * 255)),
+                                          -- (round (b * 255))))
   where
+    -- split point
     (w_rest, new_w) = (split w rest)
     (h_rest, new_h) = (split h w_rest)
+    -- region split horz and vert
     (ul_rest, ul_tags) = (mondrian x y new_w new_h h_rest)
     (ur_rest, ur_tags) = (mondrian (x + new_w) y (w - new_w) new_h ul_rest)
     (ll_rest, ll_tags) = (mondrian x (y + new_h) new_w (h - new_h) ur_rest)
     (lr_rest, lr_tags) = (mondrian (x + new_w) (y+new_h) (w - new_w) ( h - new_h) ll_rest)
-
+    -- region is split horz
     (l_rest, l_tags) = (mondrian x y new_w h w_rest)
     (r_rest, r_tags) = (mondrian (x + new_w) y (w - new_w) h l_rest)
-
+    -- region is split vert
     (t_rest, t_tags) = (mondrian x y w new_h h_rest)
     (b_rest, b_tags) = (mondrian x (y + new_h) w (h - new_h) t_rest)
 
@@ -75,8 +83,15 @@ mondrian x y w h (r:g:b:rest)
 
 split :: Int -> [Float] -> ([Float], Int)
 split x (y:rest)
-  | (round (y * 10)) == 0 = (split x rest)
-  | otherwise = (rest, x `div` (round (y * 10)))
+  | y < 0.33 || y > 0.67  = (split x rest)
+  | otherwise = (rest, round((fromIntegral x) * y)) -- x `div` (round (y * 10)))
+
+shouldSplit :: Int -> [Float] -> ([Float], Bool)
+shouldSplit x (y:rest)
+  | x < 120 = (rest, False)  -- if region is smaller than 120 then dont split
+  | (y * 1000) < 120 || (y * 1000)  > ((fromIntegral x) * 1.5)  = (shouldSplit x rest)
+  | (round (y * 1000)) < x = (rest, True)
+  | otherwise = (rest, False)
 
 --
 -- Generates an SVG tag for a rectangle.
@@ -90,23 +105,20 @@ split x (y:rest)
 --   [Float]: The remaining, unused random values
 --   String: The SVG tags that draw the image
 --
-rectangle :: Int -> Int -> Int -> Int -> (Int, Int, Int) -> String
-rectangle x y w h (r,g,b) = "<rect x=" ++ (show x) ++
-                            " y=" ++ (show y) ++
-                            " width=" ++ (show w) ++
-                            " height=" ++ (show h) ++
-                            " stroke=\"black\"" ++
-                            " fill=\"rgb(" ++ (show r) ++ "," ++
-                                              (show g) ++ "," ++
-                                              (show b) ++ ")\" />\n"
+rectangle :: Int -> Int -> Int -> Int -> [Float] -> ([Float], String)
+rectangle x y w h (r:rest) = (rest, "<rect x=" ++ (show x) ++
+                                    " y=" ++ (show y) ++
+                                    " width=" ++ (show w) ++
+                                    " height=" ++ (show h) ++
+                                    " stroke=\"black\"" ++
+                                    " fill=\"rgb(" ++ (determinColour r) ++ ")\" />\n")
 
-vline :: Int -> Int -> Int -> String
-vline x y h = (rectangle x y 2 h (0,0,0))
-{-vline x y h = "<rect x=" ++ (show x) ++
-              " y=" ++ (show y) ++
-              " width="1" height=" ++ (show h) ++
-              " stroke=\"None\"" ++
-              " fill=\"rgb(0,0,0)\" />\n"-}
+determinColour :: Float -> String
+determinColour r
+  | r < 0.0833  = "255,0,0"
+  | r < 0.1667  = "135,206,235"
+  | r < 0.25    = "255,255,0"
+  | otherwise   = "255,255,255"
 
 --
 -- The main program which generates and outputs mondrian.html.
