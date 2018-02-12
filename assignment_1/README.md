@@ -3,10 +3,10 @@
 ## Compile and Run instructions
 
 To compile in terminal, run from the project root dir:
-**$ ghc -o assign2 src/assign1.hs **
+> $ ghc -o assign2 src/assign1.hs
 
 To run from terminal execute the command:
-**./assign1**
+> ./assign1
 
 ## Assignment Overview
 

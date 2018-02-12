@@ -3,10 +3,10 @@
 ## Compile and Run instructions
 
 To compile in terminal, run from the project root dir:
-**$ ghc -o assign2 src/assign2.hs **
+> $ ghc -o assign2 src/assign2.hs
 
 To run from terminal execute the command:
-**./assign2**
+> ./assign2
 
 You must enter the full path of the file when prompted, eg: 'img/Mondrian.png'
 
