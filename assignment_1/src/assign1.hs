@@ -190,4 +190,4 @@ main = do
       image = snd (mondrian 0 0 width height randomValues)
       suffix = "</svg>\n</html>"
 
-  writeFile "mondrian.html" (prefix ++ image ++ suffix)
+  writeFile "output/mondrian.html" (prefix ++ image ++ suffix)
