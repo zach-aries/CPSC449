@@ -36,9 +36,28 @@ randomInt :: Int -> Int -> Float -> Int
 randomInt low high x = round ((fromIntegral (high - low) * x) + fromIntegral low)
 
 --
--- Generate the tag for a rectangle with random color.  Replace the
--- implementation of this function so that it generates all of the tags
--- needed for a piece of random Mondrian art.
+-- Mondrian algorithm:
+
+-- If the region is wider than half the initial canvas size and the region is taller than half the initial
+-- canvas height:
+--    Use recursion to split the region into 4 smaller regions (a vertical split and a horizontal
+--    split) with both split locations chosen randomly.
+-- Else if the region is wider than half the initial canvas size:
+--    Use recursion to split the region into 2 smaller regions using a vertical line with the split
+-- l    ocation chosen randomly.
+-- Else if the region is taller than half the initial canvas size:
+--    Use recursion to split the region into 2 smaller regions using a horizontal line with the
+--    split location chosen randomly.
+-- Else if the region is big enough to split both horizontally and vertically, and both a horizontal and
+-- vertical split are randomly selected:
+--    Use recursion to split the region into 4 smaller regions (a vertical split and a horizontal
+--    split) with both split locations chosen randomly.
+-- Else if the region is wide enough to split horizontally, and a horizontal split is randomly selected:
+--    Use recursion to split the region into 2 smaller regions using a vertical line with the split
+--    location chosen randomly.
+-- Else if the region is tall enough to split vertically, a vertical split is randomly selected:
+--    Use recursion to split the region into 2 smaller regions using a horizontal line with the
+--    split location chosen randomly.
 --
 -- Parameters:
 --   x, y: The upper left corner of the region
@@ -53,8 +72,8 @@ randomInt low high x = round ((fromIntegral (high - low) * x) + fromIntegral low
 
 mondrian :: Int -> Int -> Int -> Int -> [Float] -> ([Float], String)
 mondrian x y w h (r:g:b:rest)
-  | w > 512 && h > 384 = (lr_rest, ul_tags ++ ur_tags ++ ll_tags ++ lr_tags)
-  | w > 512 = (r_rest, l_tags ++ r_tags)
+  | w > (width `div` 2) && h > (height `div` 2) = (lr_rest, ul_tags ++ ur_tags ++ ll_tags ++ lr_tags)
+  | w > (width `div` 2) = (r_rest, l_tags ++ r_tags)
   | h > 384 = (b_rest, t_tags ++ b_tags)
   | snd (shouldSplit w rest) && snd (shouldSplit h rest) = (lr_rest, ul_tags ++ ur_tags ++ ll_tags ++ lr_tags)
   | snd (shouldSplit w rest) = (r_rest, l_tags ++ r_tags)
@@ -67,31 +86,53 @@ mondrian x y w h (r:g:b:rest)
     -- split point
     (w_rest, new_w) = (split w rest)
     (h_rest, new_h) = (split h w_rest)
-    -- region split horz and vert
+    -- split region horzizontally and vertically
     (ul_rest, ul_tags) = (mondrian x y new_w new_h h_rest)
     (ur_rest, ur_tags) = (mondrian (x + new_w) y (w - new_w) new_h ul_rest)
     (ll_rest, ll_tags) = (mondrian x (y + new_h) new_w (h - new_h) ur_rest)
     (lr_rest, lr_tags) = (mondrian (x + new_w) (y+new_h) (w - new_w) ( h - new_h) ll_rest)
-    -- region is split horz
+    -- split region horzizontally
     (l_rest, l_tags) = (mondrian x y new_w h w_rest)
     (r_rest, r_tags) = (mondrian (x + new_w) y (w - new_w) h l_rest)
-    -- region is split vert
+    -- region is split vertically
     (t_rest, t_tags) = (mondrian x y w new_h h_rest)
     (b_rest, b_tags) = (mondrian x (y + new_h) w (h - new_h) t_rest)
 
 
-
+--
+-- Generates a split point for a region
+--
+-- Parameters:
+--   x: the width or height to split
+--   [Float]: list of random values
+--
+-- Returns:
+--   [Float]: The remaining, unused random values
+--   Int: split value of height or width
+--
 split :: Int -> [Float] -> ([Float], Int)
 split x (y:rest)
   | y < 0.33 || y > 0.67  = (split x rest)
-  | otherwise = (rest, round((fromIntegral x) * y)) -- x `div` (round (y * 10)))
+  | otherwise = (rest, round((fromIntegral x) * y))
+
+--
+-- Decides whether the region should be split or not
+--
+-- Parameters:
+--   x: the width or height to split
+--   [Float]: list of random values
+--
+-- Returns:
+--   [Float]: The remaining, unused random values
+--   Bool: True if region should be split, false if not
+--
 
 shouldSplit :: Int -> [Float] -> ([Float], Bool)
 shouldSplit x (y:rest)
-  | x < 120 = (rest, False)  -- if region is smaller than 120 then dont split
-  | (y * 1000) < 120 || (y * 1000)  > ((fromIntegral x) * 1.5)  = (shouldSplit x rest)
-  | (round (y * 1000)) < x = (rest, True)
-  | otherwise = (rest, False)
+  | x < 120 = (rest, False)                 -- if region is smaller than 120 then dont split
+  | (y * 1000) < 120 || (y * 1000)  > ((fromIntegral x) * 1.5)  = (shouldSplit x rest) -- if random value is greater than 120 or less than the region * 1.5 then get a new number
+  | (round (y * 1000)) < x = (rest, True)   -- random value is less than region size so split
+  | otherwise = (rest, False)               -- random value is greater than region size, so don't split
 
 --
 -- Generates an SVG tag for a rectangle.
@@ -113,12 +154,22 @@ rectangle x y w h (r:rest) = (rest, "<rect x=" ++ (show x) ++
                                     " stroke=\"black\"" ++
                                     " fill=\"rgb(" ++ (determinColour r) ++ ")\" />\n")
 
+
+--
+-- Determines the colour of the SVG rectangle
+--
+-- Parameters:
+--   Float: random value
+--
+-- Returns:
+--   String: RGB value of rectangle
+--
 determinColour :: Float -> String
 determinColour r
-  | r < 0.0833  = "255,0,0"
-  | r < 0.1667  = "135,206,235"
-  | r < 0.25    = "255,255,0"
-  | otherwise   = "255,255,255"
+  | r < 0.0833  = "255,0,0"       -- If r < 0.0833 then fill the region with red
+  | r < 0.1667  = "135,206,235"   -- Else if r < 0.1667 then fill the region with skyblue
+  | r < 0.25    = "255,255,0"     -- Else if r < 0.25 then fill the region with yellow
+  | otherwise   = "255,255,255"   -- Else fill the region with white
 
 --
 -- The main program which generates and outputs mondrian.html.
